@@ -1,0 +1,62 @@
+import gzip
+import random
+import ssl
+import time
+from urllib.request import Request, urlopen
+import requests
+from bs4 import BeautifulSoup as bs
+ssl._create_default_https_context = ssl._create_unverified_context
+
+
+URL = 'https://www.idealista.com/buscar/venta-viviendas/29670/pagina-2.htm'
+headers = {
+    "Host": "www.idealista.com",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/109.0",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,/;q=0.8",
+    "Accept-Language": "es-ES,es;q=0.8,en-US;q=0.5,en;q=0.3",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "cross-site",
+}
+
+# method_1 :
+
+req = Request(URL, headers=headers)
+response = urlopen(req, timeout=10).read()
+html_page = gzip.decompress(response).decode('utf-8')
+
+soup = bs(html_page, 'html.parser')
+
+title_elements = soup.find_all('span', attrs={'class': 'main-info__title-main'})
+print("Title: ", title_elements[0].text.strip())
+
+localizacion = soup.find_all('span', attrs={'class': 'main-info__title-minor'})
+
+print("Localizacion: ", localizacion[0].text.strip())
+
+precio_descuento = soup.find_all('span', attrs={'class': 'info-data-price'})
+
+print("Precio: ", precio_descuento[0].text.strip())
+
+try:
+    precio_sin_descuento = soup.find_all('span', attrs={'class': 'info-data-price'})
+
+except:
+   print("No esta en rebajas")
+
+c1 = soup.find("section", {"id": "details"}).find("div", {"class": "details-property-feature-one"})
+c1_basicas = [caract.text.strip() for caract in c1.find_all("li")]
+
+c2 = soup.find("section", {"id": "details"}).find("div", {"class": "details-property-feature-two"})
+c2_basicas = [caract.text.strip() for caract in c2.find_all("li")]
+
+c3 = soup.find("section", {"id": "details"}).find("div", {"class": "details-property-feature-three"})
+c3_basicas = [caract.text.strip() for caract in c3.find_all("li")]
+
+print(c2_basicas)
+print(c1_basicas)
+
+
