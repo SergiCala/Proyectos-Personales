@@ -1,26 +1,46 @@
 import requests
-
-with open("proxys.py", "r") as f:
-    proxies = f.read().split("\n")
-
+from bs4 import BeautifulSoup as bs
+import ssl
 
 
-sites_to_check = ["http://books.toscrape.com",
-                  "http://books.toscrape.com/catalogue/category/books/travel_2/index.html",
-                  "http://books.toscrape.com/catalogue/category/books/sequential-art_5/index.html"]
+ssl._create_default_https_context = ssl._create_unverified_context
+import os
+from random import choice
 
-# Nos comprobara un proxy por sitio web que le añadamos a la lista anterior
 
-contador = 0
+def get_proxies():
+    proxy_url = "https://github.com/SergiCala/Proyectos-Personales/blob/main/proxies"
 
-for site in sites_to_check:
-    try:
-        print(f" Estamos usando el proxy: {proxies[contador]}")
-        res = requests.get(site, proxies={"http": proxies[contador],
-                                          "https": proxies[contador]})
-        print(res.status_code)
+    r = requests.get(proxy_url)
+    soup_proxy = bs(r.content, "html.parser").find_all("td", {"class": "blob-code blob-code-inner js-file-line"})
+    proxies = [proxy.text for proxy in soup_proxy]
+    return proxies
 
-        contador += 1
-    except:
-        print("Error: ")
 
+def get_random_proxy(proxies):
+    return {"https": choice(proxies)}
+
+
+proxies = get_proxies()
+
+
+def get_working_proxies():
+    working_proxy = []
+    for i in range(100):
+
+        proxy = get_random_proxy(proxies)
+        print(f"using {proxy}...")
+        try:
+            r = requests.get("https://www.google.com", proxies=proxy, timeout=2)
+            print(r.status_code)
+
+            if r.status_code == 200:
+                working_proxy.append(proxy)
+
+
+        except:
+            pass
+
+    print(working_proxy)
+
+get_working_proxies()
