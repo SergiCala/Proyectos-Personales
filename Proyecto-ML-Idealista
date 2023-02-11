@@ -1,0 +1,582 @@
+# Creado en Google Collab 
+
+# El Dataset esta creado por mi mismo
+
+
+# Importacion de librerias
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split as tts
+import seaborn as sns
+import graphviz
+
+# Importacion del CSV 
+
+from google.colab import files
+uploaded = files.upload()
+
+import io
+data = pd.read_csv(io.BytesIO(uploaded["house_data.csv"]))
+
+#Mostramos todas las columnas del df
+
+data.head()
+
+# Eliminamos las columnas sin valor para la prediccion
+
+data.drop(["energy_certification", "id"], axis=1, inplace=True)
+
+
+# Modificamos el valor de True y False para conventirlos en 1 o 0 segun convenga
+
+data["has_lift"] = data["has_lift"].astype(int)
+data["has_garden"] = data["has_garden"].astype(int)
+data["has_swimming_pool"] = data["has_swimming_pool"].astype(int)
+data["has_terrace"] = data["has_terrace"].astype(int)
+data
+
+#Mostramos la correlacion que hay entre las variables
+
+data_correlation = data.corr()
+data_correlation
+
+#Creamos una mascara para el heatmap
+
+my_mask = np.triu(np.ones_like(data_correlation, dtype=bool))
+
+#Paleta de colores del heatmap
+
+my_cmap = sns.diverging_palette(100, 20, s = 200, l =50, n=5,
+                                center = "dark",
+                                as_cmap = True)
+
+plt.figure(figsize=(40,10))
+
+sns.heatmap(data_correlation, mask = my_mask,
+            cmap = my_cmap, center = 0, fmt = ".2f",
+            annot = True, square = True)
+
+plt.show()
+
+
+#Matriz de graficos de dispersion
+
+from pandas.plotting import scatter_matrix
+
+attributes = ["price", "rooms_number", "bath_number", "has_lift", "has_garden",
+              "has_swimming_pool", "has_terrace", "constructed_area",
+              "is_new_development", "is_needs_renovating", "is_good_condition"]
+
+scatter_matrix(data[attributes],
+              figsize = (40,20),
+              color = "black")
+
+plt.show()
+
+
+#Correlacion entre precio y m2
+
+fig, ax = plt.subplots(figsize=(30,7))
+
+ax.scatter(x = "constructed_area", y = "price", data = data, c = "black")
+
+ax.set_xlabel("m2")
+ax.set_ylabel("Price")
+ax.set_title("Correlacion: M2-Price")
+plt.show()
+
+#Añadimos a X e Y los valores del dataset para poder testear los diferentes modelos
+
+x = data.drop(["price"], axis=1)
+x
+
+y = data["price"]
+y
+
+x_train, x_test, y_train, y_test = tts(x, y, test_size=0.20)
+
+x_train
+
+x_test
+
+y_train
+
+y_test
+
+#Modelo de Regresion Lineal
+
+#Librerias necesarias y modelo
+
+from sklearn.linear_model import LinearRegression
+
+data_model_lr = LinearRegression()
+
+
+#Deberemos añadir .values al final de las variables devolvera un array de 2 dimensiones
+
+
+data_model_lr.fit(x_train.values, y_train.values)
+
+print("Proceso completado")
+
+
+#Para visualizar los datos usaremos .predict sobre x_test y lo guardaremos en una variable nueva
+
+#Realizamos un bucle entre y_pred e y_test sacandoles con un print para comprobar diferencias
+
+#Añadiremos una tercera columna ABS para comprobar el error entre y_pred e y_test
+
+#Prediccion
+
+
+y_pred_lr = data_model_lr.predict(x_test.values)
+
+y_test_array_lr = y_test.values
+
+print("Prec real Prec estim Error abs")
+for price in range(10):
+  real_price = y_test_array_lr[price]
+  estim_price = y_pred_lr[price]
+  error_abs = abs(real_price - estim_price)
+  print(f"{real_price:6.2f} {estim_price:12.2f} {error_abs:16.2f}")
+
+
+#Librerias a importar
+from sklearn.metrics import mean_squared_error
+from sklearn.metrics import r2_score
+
+
+#Calcularemos coeficientes, error cuadratico medio y coeficiente de determinacion
+
+#Coeficientes
+print("Coeficienes: \n", data_model_lr.coef_)
+
+#MSE
+print("MSE: %.2f" % mean_squared_error(y_test_array_lr, y_pred_lr, squared=False))
+
+#Coeficiente de determinacion: 1 es una prediccion perfecta
+print("Coeficiente de determinacion: %.2f" % r2_score(y_test_array_lr, y_pred_lr))
+
+#Visualizacion del modelo
+
+fig, ax = plt.subplots(figsize=(20, 10))
+
+ax.set_xlabel("Predict price")
+ax.set_ylabel("Real price")
+ax.set_title("Model representation")
+
+sns.regplot(x = y_pred_lr,
+            y = y_test_array_lr,
+            color = "#34495E",
+            scatter_kws = {"alpha":1, "edgecolor":"#196F3D"},
+            line_kws = {"color":"blue"})
+
+ax.legend(["Prediction", "Price"]);
+
+#Prueba de prediccion:
+
+house_lr = np.array([[2, 1, 0, 0, 0, 0, 80, 0, 0, 1]])
+
+print(f"El precio de la casa es {data_model_lr.predict(house_lr)[0].round()}€")
+
+#Modelo de regresion Lasso
+
+#Importamos librerias necesarias
+
+from sklearn.linear_model import Lasso
+
+data_model_ls = Lasso()
+
+#Entrenamos el modelo
+
+data_model_ls.fit(x_train.values, y_train.values)
+
+print("Proceso completado")
+
+#En todos convertiremos la variable x_test en y_pred y probaremos el modelo
+
+y_pred_ls = data_model_ls.predict(x_test.values)
+y_test_array_ls = y_test.values
+
+print("Real price Estim price Error abs")
+for price in range(10):
+  real_price = y_pred_ls[price]
+  estim_price = y_test_array_ls[price]
+  error_abs = abs(real_price - estim_price)
+  print(f"{real_price:6.2f} {estim_price:12.2f} {error_abs:16.2f}")
+
+
+#Coeficientes, MSE y Coeficiente de determinacion
+
+#Coeficientes
+print("Coeficientes: \n", data_model_ls)
+
+#MSE
+print("MSE: %.2f" % mean_squared_error(y_test_array_ls, y_pred_ls, squared=False))
+
+#Coeficiente de determinacion
+print("Coeficiente de determinacion: %.2f" % r2_score(y_test_array_ls, y_pred_ls))
+
+#Visualizamos el resultado
+
+
+fig, ax = plt.subplots(figsize=(20, 10))
+
+ax.set_xlabel("Predict price")
+ax.set_ylabel("Real price")
+ax.set_title("Model representation")
+
+sns.regplot(x = y_pred_ls,
+            y = y_test_array_ls,
+            color = "#34495E",
+            scatter_kws = {"alpha":1, "edgecolor":"#196F3D"},
+            line_kws = {"color":"blue"})
+
+ax.legend(["Prediction", "Price"]);
+
+#Prueba de prediccion
+
+house_ls = np.array([[2, 1, 0, 0, 0, 0, 80, 0, 0, 1]])
+
+print(f"El precio de la casa es {data_model_ls.predict(house_ls)[0].round()}€")
+
+#Modelo de regresion Ridge
+
+#Importacion de librerias y modelo
+
+from sklearn.linear_model import Ridge
+
+data_model_rg = Ridge()
+
+data_model_rg.fit(x_train.values, y_train.values)
+
+print("Proceso completado")
+
+#En todos convertiremos la variable x_test en y_pred y probaremos el modelo
+
+y_pred_rg = data_model_rg.predict(x_test.values)
+y_test_array_rg = y_test.values
+
+print("Real price Estim price Error abs")
+for price in range(10):
+  real_price = y_pred_rg[price]
+  estim_price = y_test_array_rg[price]
+  error_abs = abs(real_price - estim_price)
+  print(f"{real_price:6.2f} {estim_price:12.2f} {error_abs:16.2f}")
+
+#Coeficientes, MSE y Coeficiente de determinacion
+
+#Coeficientes
+print("Coeficientes: \n", data_model_rg)
+
+#MSE
+print("MSE: %.2f" % mean_squared_error(y_test_array_rg, y_pred_rg, squared=False))
+
+#Coeficiente de determinacion
+print("Coeficiente de determinacion: %.2f" % r2_score(y_test_array_rg, y_pred_rg))
+
+#Visualizamos el resultado
+
+
+fig, ax = plt.subplots(figsize=(20, 10))
+
+ax.set_xlabel("Predict price")
+ax.set_ylabel("Real price")
+ax.set_title("Model representation")
+
+sns.regplot(x = y_pred_rg,
+            y = y_test_array_rg,
+            color = "#34495E",
+            scatter_kws = {"alpha":1, "edgecolor":"#196F3D"},
+            line_kws = {"color":"blue"})
+
+ax.legend(["Prediction", "Price"]);
+
+#Prueba de prediccion
+
+house_rg = np.array([[2, 1, 0, 0, 0, 0, 80, 0, 0, 1]])
+
+print(f"El precio de la casa es {data_model_ls.predict(house_rg)[0].round()}€")
+
+#Modelo Arbol de Decision
+
+#Importamos librerias y modelos
+
+from sklearn.tree import DecisionTreeRegressor
+
+data_model_tree = DecisionTreeRegressor()
+
+data_model_tree.fit(x_train.values, y_train.values)
+
+print("Proceso completado")
+
+y_pred_tree = data_model_tree.predict(x_test.values)
+y_test_array_tree = y_test.values
+
+print("Real price Estim price Error abs")
+for price in range(100):
+  real_price = y_pred_tree[price]
+  estim_price = y_test_array_tree[price]
+  error_abs = abs(real_price - estim_price)
+  print(f"{real_price:6.2f} {estim_price:12.2f} {error_abs:16.2f}")
+
+#Final del entrenamiento
+
+y_pred_tree_re = y_pred_tree[::-1]
+y_test_array_tree_re = y_test_array_tree[::-1]
+
+print("Real price Estim price Error abs")
+for i in range(10):
+  real_price = y_pred_tree_re[i]
+  estim_price = y_test_array_tree_re[i]
+  error_abs = abs(real_price - estim_price)
+  print(f"{real_price:6.2f} {estim_price:12.2f} {error_abs:16.2f}")
+
+#Coeficientes, MSE y Coeficiente de determinacion
+
+#Coeficientes
+print("Coeficientes: \n", data_model_tree)
+
+#MSE
+print("MSE: %.2f" % mean_squared_error(y_test_array_tree, y_pred_tree, squared=False))
+
+#Coeficiente de determinacion
+print("Coeficiente de determinacion: %.2f" % r2_score(y_test_array_tree, y_pred_tree))
+
+fig, ax = plt.subplots(figsize=(20, 10))
+
+ax.set_xlabel("Predict price")
+ax.set_ylabel("Real price")
+ax.set_title("Model representation")
+
+sns.regplot(x = y_pred_tree,
+            y = y_test_array_tree,
+            color = "#34495E",
+            scatter_kws = {"alpha":1, "edgecolor":"#196F3D"},
+            line_kws = {"color":"blue"})
+
+ax.legend(["Prediction", "Price"]);
+
+#Prueba de prediccion
+
+house_tree = np.array([[2, 1, 0, 0, 0, 0, 80, 0, 0, 1]])
+
+print(f"El precio de la casa es {data_model_tree.predict(house_tree)[0].round()}€")
+
+#Importamos modelo y librerias necesarias
+
+from sklearn.ensemble import RandomForestRegressor
+
+data_model_rf = RandomForestRegressor()
+
+data_model_rf.fit(x_train.values, y_train.values)
+
+print("Proceso terminado")
+
+#Comprobamos diferencias y error absoluto
+
+y_pred_rf = data_model_rf.predict(x_test.values)
+y_test_array_rf = y_test.values
+
+print("Real price Estim price Error abs")
+for price in range(10):
+  real_price = y_pred_rf[price]
+  estim_price = y_test_array_rf[price]
+  error_abs = abs(real_price - estim_price)
+  print(f"{real_price:6.2f} {estim_price:12.2f} {error_abs:16.2f}")
+
+#Comprobamos los mismos valores pero a la inversa
+
+y_pred_rf_rf = y_pred_rf[::-1]
+y_test_array_rf_rf = y_test_array_rf[::-1]
+
+print("Real price Estim price Error abs")
+for i in range(100):
+  real_price = y_pred_rf_rf[i]
+  estim_price = y_test_array_rf_rf[i]
+  error_abs = abs(real_price - estim_price)
+  print(f"{real_price:6.2f} {estim_price:12.2f} {error_abs:16.2f}")
+
+#Coeficientes, MSE y Coeficiente de determinacion
+
+#Coeficientes
+print("Coeficientes: \n", data_model_rf)
+
+#MSE
+print("MSE: %.2f" % mean_squared_error(y_test_array_rf, y_pred_rf, squared=False))
+
+#Coeficiente de determinacion
+print("Coeficiente de determinacion: %.2f" % r2_score(y_test_array_rf, y_pred_rf))
+
+fig, ax = plt.subplots(figsize=(20, 10))
+
+ax.set_xlabel("Predict price")
+ax.set_ylabel("Real price")
+ax.set_title("Model representation")
+
+sns.regplot(x = y_pred_rf,
+            y = y_test_array_rf,
+            color = "#34495E",
+            scatter_kws = {"alpha":1, "edgecolor":"#196F3D"},
+            line_kws = {"color":"blue"})
+
+ax.legend(["Prediction", "Price"]);
+
+#Importamos las librerias y modelo
+
+from sklearn.ensemble import GradientBoostingRegressor
+
+data_model_gr = GradientBoostingRegressor()
+
+data_model_gr.fit(x_train.values, y_train.values)
+
+print("Proceso completado")
+
+#Comprobamos diferencias y error absoluto
+
+y_pred_gr = data_model_gr.predict(x_test.values)
+y_test_array_gr = y_test.values
+
+print("Real price Estim price Error abs")
+for price in range(10):
+  real_price = y_pred_gr[price]
+  estim_price = y_test_array_gr[price]
+  error_abs = abs(real_price - estim_price)
+  print(f"{real_price:6.2f} {estim_price:12.2f} {error_abs:16.2f}")
+
+#Coeficientes, MSE y Coeficiente de determinacion
+
+#Coeficientes
+print("Coeficientes: \n", data_model_gr)
+
+#MSE
+print("MSE: %.2f" % mean_squared_error(y_test_array_rf, y_pred_rf, squared=False))
+
+#Coeficiente de determinacion
+print("Coeficiente de determinacion: %.2f" % r2_score(y_test_array_gr, y_pred_gr))
+
+fig, ax = plt.subplots(figsize=(20, 10))
+
+ax.set_xlabel("Predict price")
+ax.set_ylabel("Real price")
+ax.set_title("Model representation")
+
+sns.regplot(x = y_pred_gr,
+            y = y_test_array_gr,
+            color = "#34495E",
+            scatter_kws = {"alpha":1, "edgecolor":"#196F3D"},
+            line_kws = {"color":"blue"})
+
+ax.legend(["Prediction", "Price"]);
+
+#Representaremos los 6 modelos de forma grafica para comprobar cual de ellos es el mas adecuado para nosotros
+
+#Preparacion de los graficos
+
+plt.style.use("dark_background")
+
+fig, ax = plt.subplots(figsize = (50, 20), nrows = 2, ncols = 3)
+
+# Si queremos pasar parametros adicicionales tengo que usar:
+
+# scatter_kws -> Para añadir parametros de plt.scatter y plt.plot
+# line_kws -> Lo mismo pero para la linea
+# fit_reg -> Activa la visualización de la linea
+
+
+#Regresion lineal
+
+ax[0, 0].set_xlabel("Predicted price")
+ax[0, 0].set_ylabel("Actual price")
+ax[0, 0].set_title("Regresion Lineal")
+
+sns.regplot(x = y_pred_ls, y = y_test_array_ls,
+            color = "#34495E",
+            scatter_kws={"alpha":1, "edgecolor":"#196F3D"},
+            fit_reg=True,
+            ax = ax[0, 0])
+
+ax[0, 0].legend(["Prediction", "Price-House"])
+
+
+#Ridge
+
+ax[0, 1].set_xlabel("Predicted price")
+ax[0, 1].set_ylabel("Actual price")
+ax[0, 1].set_title("Regresion Lineal")
+
+sns.regplot(x = y_pred_rg, y = y_test_array_rg,
+            color = "#34495E",
+            scatter_kws={"alpha":1, "edgecolor":"#196F3D"},
+            fit_reg=True,
+            ax = ax[0, 1])
+
+ax[0, 1].legend(["Prediction", "Price-House"])
+
+
+#Lasso
+
+ax[0, 2].set_xlabel("Predicted price")
+ax[0, 2].set_ylabel("Actual price")
+ax[0, 2].set_title("Regresion Lineal")
+
+sns.regplot(x = y_pred_ls, y = y_test_array_ls,
+            color = "#34495E",
+            scatter_kws={"alpha":1, "edgecolor":"#196F3D"},
+            fit_reg=True,
+            ax = ax[0, 2])
+
+ax[0, 2].legend(["Prediction", "Price-House"])
+
+
+#Decision Tree
+
+ax[1, 0].set_xlabel("Predicted price")
+ax[1, 0].set_ylabel("Actual price")
+ax[1, 0].set_title("Regresion Lineal")
+
+sns.regplot(x = y_pred_tree, y = y_test_array_tree,
+            color = "#34495E",
+            scatter_kws={"alpha":1, "edgecolor":"#196F3D"},
+            fit_reg=True,
+            ax = ax[1, 0])
+
+ax[1, 0].legend(["Prediction", "Price-House"])
+
+
+#Random Forest
+
+ax[1, 1].set_xlabel("Predicted price")
+ax[1, 1].set_ylabel("Actual price")
+ax[1, 1].set_title("Regresion Lineal")
+
+sns.regplot(x = y_pred_rf, y = y_test_array_rf,
+            color = "#34495E",
+            scatter_kws={"alpha":1, "edgecolor":"#196F3D"},
+            fit_reg=True,
+            ax = ax[1, 1])
+
+ax[1, 1].legend(["Prediction", "Price-House"])
+
+
+#Gradient Boosting
+
+ax[1, 2].set_xlabel("Predicted price")
+ax[1, 2].set_ylabel("Actual price")
+ax[1, 2].set_title("Regresion Lineal")
+
+sns.regplot(x = y_pred_gr, y = y_test_array_gr,
+            color = "#34495E",
+            scatter_kws={"alpha":1, "edgecolor":"#196F3D"},
+            fit_reg=True,
+            ax = ax[1, 2])
+
+ax[1, 2].legend(["Prediction", "Price-House"])
+
+#Aunque expongamos los 6 modelos ya sabemos que el que mas tasa de acierto tiene seria en este caso el modelo de Arbol de Decisiones
+
+#Es un dataset de un tamaño muy pequeño (Unas 1000 viviendas), por lo que es un rango de valores muy bajo a predecir
+
+#Este ha sido el primer modelo creado y comprobado con un Dataset propio
