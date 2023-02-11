@@ -1,0 +1,141 @@
+import csv
+import gzip
+import json
+import random
+import ssl
+import time
+from urllib.request import Request, urlopen
+import requests
+from bs4 import BeautifulSoup as bs
+
+ssl._create_default_https_context = ssl._create_unverified_context
+import os
+
+
+
+def parse_script(script):
+    utag_data = script.split(";")[0]
+    raw_data = (
+        utag_data.replace("var utag_data = ", "")
+        .replace("<script>", "")
+        .replace("</script>", "")
+        .strip()
+    )
+    data = json.loads(raw_data)
+    main = data["ad"]
+    characteristics = main["characteristics"]
+    condition = main["condition"]
+
+
+
+    return {
+        "id": main["id"],
+        "energy_certification": main["energyCertification"]["type"].upper(),
+        "price": main["price"],
+        "rooms_number": characteristics["roomNumber"],  # Nº de habitaciones
+        "bath_number": characteristics["bathNumber"],  # Nº de baños
+        "has_lift": True
+        if characteristics.get("hasLift", "0") == "1"
+        else False,  # Tiene ascensor
+        "has_garden": True
+        if characteristics.get("hasGarden", "0") == "1"
+        else False,  # Tiene jardín
+        "has_swimming_pool": True
+        if characteristics.get("hasSwimmingPool", "0") == "1"
+        else False,  # Tiene piscina
+        "has_terrace": True
+        if characteristics.get("hasTerrace", "0") == "1"
+        else False, # Tiene terraza"
+        "constructed_area": characteristics["constructedArea"],
+        "is_new_development": condition["isNewDevelopment"],
+        "is_needs_renovating": condition["isNeedsRenovating"],
+        "is_good_condition": condition["isGoodCondition"]
+
+    }
+
+
+def write_csv(data):
+    filename = "house_data1.csv"
+    header = list(data.keys())
+    file_already_exists = os.path.isfile(filename)
+
+    with open(filename, "a", encoding="UTF8", newline="") as f:
+        write = csv.DictWriter(f, fieldnames=header)
+
+        if not file_already_exists:
+            write.writeheader()
+
+        print(os.path.isfile(filename))
+        write.writerow(data)
+
+
+headers = {
+    "Host": "www.idealista.com",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/109.0",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,/;q=0.8",
+    "Accept-Language": "es-ES,es;q=0.8,en-US;q=0.5,en;q=0.3",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "cross-site",
+}
+
+busqueda = "29670"
+busqueda = busqueda.replace(" ", "_")
+ids = []
+proxy = '184.168.122.103:7890'
+pagina = 2
+texto = []
+
+
+
+
+
+
+
+while True:
+    if pagina == 100:
+        break
+    try:
+        url = f"https://www.idealista.com/buscar/venta-viviendas/{busqueda}/pagina-{pagina}.htm?ordenado-por=precios-asc"
+        req = Request(url, headers=headers)
+        respuesta = urlopen(req, timeout=10)
+
+    except Exception as e:
+        print(f"Error {e}")
+        break
+
+    print(respuesta.geturl())
+
+    html_page = gzip.decompress(respuesta.read()).decode('utf-8')
+    soup = bs(html_page, "lxml")
+
+    articles = soup.find("main", {"class": "listing-items"}).find_all("article")
+
+    for article in articles:
+        id_inmuebles = article.get("data-adid")
+        ids.append(id_inmuebles)
+
+    print(ids)
+
+    for id in ids:
+
+        URL = f"https://www.idealista.com/inmueble/{id}/"
+        req1 = Request(URL, headers=headers)
+        respuesta1 = urlopen(req1, timeout=10)
+
+        html_page = gzip.decompress(respuesta1.read()).decode('utf-8')
+        soup = bs(html_page, "lxml")
+
+        scripts = soup.find_all("script")
+
+        for script in scripts:
+
+            if "var utag_data" in str(script):
+                house_data1 = parse_script(str(script))
+
+                write_csv(house_data1)
+
+    pagina +=1
